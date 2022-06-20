@@ -1,0 +1,56 @@
+import json
+import boto3 
+
+def lambda_handler(event, context):
+    
+    sts = boto3.client(
+         "sts"
+    )
+    account_id = sts.get_caller_identity()["Account"]
+    aws_service='config'
+    role_arn = f"arn:aws:iam::672432851135:role/config_lambda"
+    sts_auth = sts.assume_role(RoleArn=role_arn, RoleSessionName="acquired_account_role")
+    credentials = sts_auth["Credentials"]
+
+        # ----------------------------- #
+        # Place all service code below
+        # ----------------------------- # 
+
+        # Section for boto3 connection with aws service 
+    sts_client = boto3.client('config',
+                              region_name='ca-central-1',
+                              aws_access_key_id=credentials["AccessKeyId"],
+                              aws_secret_access_key=credentials["SecretAccessKey"],
+                              aws_session_token=credentials["SessionToken"], )
+
+
+    create_recorder = sts_client.put_configuration_recorder(
+    ConfigurationRecorder={
+        'name': 'default',
+        'roleARN':  "arn:aws:iam::672432851135:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig",
+        'recordingGroup': {
+            'allSupported': True,
+            'includeGlobalResourceTypes': False,
+                
+        }
+    })
+    response = sts_client.start_configuration_recorder(
+      ConfigurationRecorderName='default',)
+      
+    delivery_channel = sts_client.put_delivery_channel(
+    DeliveryChannel={
+        'name': 'default',
+        's3BucketName':"config-bucket-672432851135",
+       
+        }
+)   
+    response = {
+                "enabledServices": 'enabled_services',
+                "accountData": account_id,
+                "scanData": {
+                    "service": aws_service,
+                    "status":'enabled'
+                }
+            }
+   
+    return response 
